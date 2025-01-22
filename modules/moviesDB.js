@@ -1,51 +1,50 @@
 const mongoose = require('mongoose');
 
 class MoviesDB {
-    constructor() {
-        this.Movie = null;
-    }
+  constructor() {
+    this.Movie = null;
+  }
 
-    initialize(connectionString) {
-        return new Promise((resolve, reject) => {
-            mongoose.connect(connectionString, { useNewUrlParser: true, useUnifiedTopology: true })
-                .then(() => {
-                    this.Movie = mongoose.model('Movie', new mongoose.Schema({
-                        title: String,
-                        year: Number,
-                        // Add other necessary fields based on your dataset
-                    }, { collection: 'movies' }));
-                    resolve();
-                })
-                .catch(err => reject(err));
-        });
+  async initialize(connectionString) {
+    try {
+      await mongoose.connect(connectionString, { useNewUrlParser: true, useUnifiedTopology: true });
+      this.Movie = mongoose.model('Movie', new mongoose.Schema({
+        title: String,
+        year: Number,
+        genre: String,
+        // Other movie fields...
+      }));
+      console.log('Connected to MongoDB');
+    } catch (error) {
+      console.error('Error initializing database:', error);
+      throw error;
     }
+  }
 
-    addNewMovie(data) {
-        return new this.Movie(data).save();
-    }
+  async addNewMovie(data) {
+    const movie = new this.Movie(data);
+    return movie.save();
+  }
 
-    getAllMovies(page, perPage, title) {
-        let query = this.Movie.find();
-        if (title) {
-            query = query.where('title').equals(title);
-        }
-        return query.sort({ year: 1 })
-            .skip((page - 1) * perPage)
-            .limit(perPage)
-            .exec();
-    }
+  async getAllMovies(page, perPage, title) {
+    const query = title ? { title: { $regex: title, $options: 'i' } } : {};
+    return this.Movie.find(query)
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .sort({ year: 1 });
+  }
 
-    getMovieById(id) {
-        return this.Movie.findById(id).exec();
-    }
+  async getMovieById(id) {
+    return this.Movie.findById(id);
+  }
 
-    updateMovieById(data, id) {
-        return this.Movie.findByIdAndUpdate(id, data, { new: true }).exec();
-    }
+  async updateMovieById(data, id) {
+    return this.Movie.findByIdAndUpdate(id, data, { new: true });
+  }
 
-    deleteMovieById(id) {
-        return this.Movie.findByIdAndDelete(id).exec();
-    }
+  async deleteMovieById(id) {
+    return this.Movie.findByIdAndDelete(id);
+  }
 }
 
 module.exports = MoviesDB;

@@ -1,93 +1,105 @@
-// server.js
 /*********************************************************************************
 *  WEB422 – Assignment 1
 *  I declare that this assignment is my own work in accordance with Seneca  Academic Policy.  
 *  No part of this assignment has been copied manually or electronically from any other source
 *  (including web sites) or distributed to other students.
 * 
-*  Name: _Amirhamza Saiyad_ Student ID: _151693223_ Date: _21/01/2025_
-*  Vercel Link: 
+*  Name: Amihamza Saiyad Student ID: ______________ Date: ________________
+*  Vercel Link: _______________________________________________________________
 *
-********************************************************************************/ 
+********************************************************************************/
 
-// Import required modules
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
-const MoviesDB = require('./modules/moviesDB'); 
+const MoviesDB = require('./modules/moviesDB');
 
-// Initialize environment variables
-dotenv.config();
-
-// Create an instance of Express app
 const app = express();
 const HTTP_PORT = process.env.PORT || 3000;
-
-// Create a new db instance
 const db = new MoviesDB();
 
-// Middleware to parse JSON data
+// Middleware
+app.use(cors());
 app.use(express.json());
-app.use(cors()); // Enable CORS for cross-origin requests
 
-// API Routes
+// Initialize the database and start server after connection
+db.initialize(process.env.MONGODB_CONN_STRING)
+  .then(() => {
+    app.listen(HTTP_PORT, () => {
+      console.log(`Server is running on http://localhost:${HTTP_PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Error initializing database:', err);
+    process.exit(1); // Exit if the database connection fails
+  });
 
-// POST /api/movies - Add a new movie to the collection
-app.post('/api/movies', (req, res) => {
-    db.addNewMovie(req.body)
-        .then((newMovie) => res.status(201).json(newMovie))
-        .catch((err) => res.status(500).json({ message: 'Error adding movie', error: err }));
+// API Endpoints
+
+// POST /api/movies - Add a new movie
+app.post('/api/movies', async (req, res) => {
+  const { title, year, genre } = req.body;
+  if (!title || !year) {
+    return res.status(400).json({ message: 'Title and Year are required' });
+  }
+  try {
+    const newMovie = await db.addNewMovie(req.body);
+    res.status(201).json(newMovie);
+  } catch (error) {
+    res.status(500).json({ message: 'Error adding movie', error });
+  }
 });
 
 // GET /api/movies - Get a list of movies (with optional pagination and title filtering)
-app.get('/api/movies', (req, res) => {
+app.get('/api/movies', async (req, res) => {
+  try {
     const { page = 1, perPage = 10, title } = req.query;
-    db.getAllMovies(Number(page), Number(perPage), title)
-        .then((movies) => res.json(movies))
-        .catch((err) => res.status(500).json({ message: 'Error fetching movies', error: err }));
+    const movies = await db.getAllMovies(Number(page), Number(perPage), title);
+    res.json(movies);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching movies', error });
+  }
 });
 
 // GET /api/movies/:id - Get a specific movie by its ID
-app.get('/api/movies/:id', (req, res) => {
-    db.getMovieById(req.params.id)
-        .then((movie) => {
-            if (movie) {
-                res.json(movie);
-            } else {
-                res.status(404).json({ message: 'Movie not found' });
-            }
-        })
-        .catch((err) => res.status(500).json({ message: 'Error fetching movie', error: err }));
+app.get('/api/movies/:id', async (req, res) => {
+  try {
+    const movie = await db.getMovieById(req.params.id);
+    if (movie) {
+      res.json(movie);
+    } else {
+      res.status(404).json({ message: 'Movie not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching movie', error });
+  }
 });
 
 // PUT /api/movies/:id - Update a movie by its ID
-app.put('/api/movies/:id', (req, res) => {
-    db.updateMovieById(req.body, req.params.id)
-        .then((updatedMovie) => {
-            if (updatedMovie) {
-                res.json(updatedMovie);
-            } else {
-                res.status(404).json({ message: 'Movie not found for update' });
-            }
-        })
-        .catch((err) => res.status(500).json({ message: 'Error updating movie', error: err }));
+app.put('/api/movies/:id', async (req, res) => {
+  try {
+    const updatedMovie = await db.updateMovieById(req.body, req.params.id);
+    if (updatedMovie) {
+      res.json(updatedMovie);
+    } else {
+      res.status(404).json({ message: 'Movie not found for update' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating movie', error });
+  }
 });
 
 // DELETE /api/movies/:id - Delete a movie by its ID
-app.delete('/api/movies/:id', (req, res) => {
-    db.deleteMovieById(req.params.id)
-        .then(() => res.status(204).send()) // 204 indicates successful deletion with no content in the response
-        .catch((err) => res.status(500).json({ message: 'Error deleting movie', error: err }));
+app.delete('/api/movies/:id', async (req, res) => {
+  try {
+    await db.deleteMovieById(req.params.id);
+    res.status(204).send(); // No content response
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting movie', error });
+  }
 });
 
-// Initialize the database connection and start the server
-db.initialize(process.env.MONGODB_CONN_STRING)
-    .then(() => {
-        app.listen(HTTP_PORT, () => {
-            console.log(`Server listening on http://localhost:${HTTP_PORT}`);
-        });
-    })
-    .catch((err) => {
-        console.error('Error connecting to database:', err);
-    });
-
+// Test route
+app.get('/', (req, res) => {
+  res.json({ message: 'API Listening' });
+});
